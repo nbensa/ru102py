@@ -120,7 +120,11 @@ class MetricDaoRedis(MetricDaoBase, RedisDaoBase):
         minute_of_day = self._get_day_minute(time) # pylint: disable=unused-variable
 
         # START Challenge #2
-        pipeline.zadd(metric_key, mapping={f'{value}:{minute_of_day}': minute_of_day})
+        # Note1: the following was my solution:
+        # pipeline.zadd(metric_key, mapping={f'{value}:{minute_of_day}': minute_of_day})
+        # Note: the correct/nicer way:
+        pipeline.zadd(metric_key, mapping={str(MeasurementMinute(value, minute_of_day)): minute_of_day})
+
         pipeline.expire(metric_key, METRIC_EXPIRATION_SECONDS)
         # END Challenge #2
 
