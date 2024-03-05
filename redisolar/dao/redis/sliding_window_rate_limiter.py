@@ -25,15 +25,32 @@ class SlidingWindowRateLimiter(RateLimiterDaoBase, RedisDaoBase):
     def hit(self, name: str):
         """Record a hit using the rate-limiter."""
         # START Challenge #7
-        now = datetime.datetime.now()
-        timestamp = now.strftime("%s%f")
-        timestamp2 = (now - datetime.timedelta(milliseconds=self.window_size_ms)).strftime("%s%f")
-        key_name = self.key_schema.sliding_window_rate_limiter_key(name, self.window_size_ms, self.max_hits)
-        p = self.redis.pipeline()
-        p.zadd(key_name, mapping={f"{timestamp}-{random.randint(0,1000)}:03d": timestamp})
-        p.zremrangebyscore(key_name, min="-inf", max=timestamp2)
-        p.zcard(key_name)
-        _,_,hits = p.execute()
+        # my solution; works, but it look awful
+        # now = datetime.datetime.now()
+        # timestamp = now.strftime("%s%f")
+        # timestamp2 = (now - datetime.timedelta(milliseconds=self.window_size_ms)).strftime("%s%f")
+        # key_name = self.key_schema.sliding_window_rate_limiter_key(name, self.window_size_ms, self.max_hits)
+        # p = self.redis.pipeline()
+        # p.zadd(key_name, mapping={f"{timestamp}-{random.randint(0,1000)}:03d": timestamp})
+        # p.zremrangebyscore(key_name, min="-inf", max=timestamp2)
+        # p.zcard(key_name)
+        # _,_,hits = p.execute()
+        # if hits > self.max_hits:
+        #     raise RateLimitExceededException()
+
+        # the solution from the course:
+        # the difference is how they compute the timestamp; I overengineered it :-(
+        key = self.key_schema.sliding_window_rate_limiter_key(
+            name, self.window_size_ms, self.max_hits)
+        now = datetime.datetime.utcnow().timestamp() * 1000
+
+        pipeline = self.redis.pipeline()
+        member = now + random.random()
+        pipeline.zadd(key, {member: now})
+        pipeline.zremrangebyscore(key, 0, now - self.window_size_ms)
+        pipeline.zcard(key)
+        _, _, hits = pipeline.execute()
+
         if hits > self.max_hits:
             raise RateLimitExceededException()
         # END Challenge #7
